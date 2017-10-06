@@ -109,18 +109,24 @@ uint8_t fin_permut_tbl[] = {
 };
 
 
-uint64_t permut(uint64_t block, uint8_t block_size, uint8_t* table, uint32_t table_size)
+uint64_t permut(uint64_t block, uint8_t block_size, uint8_t* tbl, uint32_t tbl_sz)
 {
 	
 	int i = 0;
-	uint64_t new_block = 0, temp_block = 0;
-	uint64_t block_mask = 0;
+	uint64_t new_block = 0;
+	uint8_t *blk_ptr = (uint8_t*)&block;
+	uint8_t *nblk_ptr = (uint8_t*)&new_block;
+	uint8_t tmp_mask = 0;
+
 	/*substitute with adresses*/
-	for( i = 0; i < table_size; i++){
-		temp_block = (block) << block_size - table[i] - 1;
-		temp_block &= 0x8000000000000000; 
-		temp_block >>= i;
-		new_block  |= temp_block;
+	for( i = 0; i < tbl_sz; i++){
+		tmp_mask = blk_ptr[(int)((tbl[i]-1)/8)];
+		tmp_mask >>= ((tbl[i]-1)%8);
+		tmp_mask &= 1;
+		if(!tmp_mask)
+			continue;
+		tmp_mask <<= (i%8);
+		nblk_ptr[(int)(i/8)] |= tmp_mask;
 	}
 		
 
@@ -174,32 +180,29 @@ void f(uint64_t* block, uint64_t key, uint8_t* key_shift_table, uint8_t iter)
 	/*TODO: implement key permutation*/
 	compr_key = scrink_key(key, key_shift_table, key_shift_table, iter);
 	
+	/*expand right halve*/
 	right48_halve = 0xffffffffffff & permut(*right_halve, 64, expn_permut_tbl, 48);
 	
 	right48_halve ^= compr_key;
 	
+	/*go through s blocks*/
 	*right_halve = 0;
 	for(i = 0, tmpblock = 0; i < SBOX_COUNT; i++, tmpblock = 0){
 		tmpblock = ((uint64_t) SBOX_BIT_MASK << i * 6) & right48_halve;
 		tmpblock = (tmpblock >> i * 6);
 		tmpblock = sbox_f(tmpblock, SB_list[i]);
-		tmpblock = (tmpblock << i * 6);
+		tmpblock = (tmpblock << i * 4);
 		*right_halve |= tmpblock;
 	}
 	
+	/*final permutation*/
 	*right_halve = permut(*right_halve, 32, fin_permut_tbl, 32);
 	
 	*right_halve ^= *left_halve;
+	
+	/*assignn left block to right*/
 	*left_halve ^= *right_halve ^= *left_halve ^= *right_halve;
-	/*TODO:
-	 * 	expand right halve
-	 * 	xor with key
-	 * 	go through s blocks
-	 * 	final permutation
-	 * 	assignn left block to right
-	 */
-	
-	
+
 }
 
 int8_t DES_iteration(uint64_t block, uint64_t key, uint8_t* key_shift_table)
