@@ -205,18 +205,20 @@ void f(uint64_t* block, uint64_t key, uint8_t* key_shift_table, uint8_t iter)
 
 }
 
-int8_t DES_iteration(uint64_t block, uint64_t key, uint8_t* key_shift_table)
+int64_t DES_iteration(uint64_t block, uint64_t key, uint8_t* key_shift_table)
 {
 	
-	int i;
+	uint8_t i;
 	
-	/*pre permutation process*/
+	/*initiali permutation*/
 	block = permut(block, 64, init_permut_tbl, 64);
 	
 	for (i = 0; i < 16; i++)
 		f(&block, key, key_shift_table, i);
 		
-	/*TODO: make post permutation*/
+	block = permut(block, 64, fin_permut_tbl, 64);
+	
+	return block;
 }
 
 void main(int argc, char** argv)
